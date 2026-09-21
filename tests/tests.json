@@ -1,0 +1,49 @@
+[
+  {
+    "name": "Flammenstreak und Kalender öffnen",
+    "sanity": true,
+    "viewport": "mobile",
+    "covers": [
+      "flame streak",
+      "calendar navigation"
+    ],
+    "description": "Prüft die Flammenanzeige im Startbildschirm und die Weiterleitung zum Kalender.",
+    "steps": [
+      "Startbildschirm öffnen",
+      "Flammen-Icon oben links mit Tageszahl prüfen",
+      "Flammen-Icon antippen"
+    ],
+    "expected": "Die Tagesanzahl der aktuellen Flammenserie ist sichtbar und ein Tippen öffnet den Kalender/Fortschritt."
+  },
+  {
+    "name": "Gewichtsverlauf im Profil",
+    "viewport": "desktop",
+    "covers": [
+      "weight tracking",
+      "weight graph",
+      "weight history"
+    ],
+    "description": "Prüft, dass gespeicherte Gewichtswerte als Verlauf im Profil geöffnet werden können.",
+    "steps": [
+      "Profil öffnen",
+      "Auf das aktuelle Gewicht tippen",
+      "Gewichtsverlauf prüfen"
+    ],
+    "expected": "Ein Graph mit den gespeicherten Gewichtsmesspunkten wird angezeigt."
+  },
+  {
+    "name": "Kalendertag zeigt Ernährung",
+    "viewport": "mobile",
+    "covers": [
+      "calendar day details",
+      "historical nutrition"
+    ],
+    "description": "Prüft, dass vergangene Ernährungseinträge im Tagesdetail sichtbar sind.",
+    "steps": [
+      "Einen Ernährungseintrag speichern",
+      "Kalender öffnen",
+      "Einen Tag mit gespeicherten Daten antippen"
+    ],
+    "expected": "Im Tagesdetail werden Ernährungseinträge, Kalorien und weitere Tageswerte angezeigt."
+  }
+]
