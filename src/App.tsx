@@ -1,4 +1,4 @@
-mport { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, Apple, BarChart3, CalendarDays, Camera, Check, ChevronDown, ChevronRight, Dumbbell,
   Droplets, ExternalLink, Flame, Home, Info, Link2, Pencil, Plus, Scale, Settings, Clock3, CircleX,
