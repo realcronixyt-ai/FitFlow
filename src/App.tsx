@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+mport { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, Apple, BarChart3, CalendarDays, Camera, Check, ChevronDown, ChevronRight, Dumbbell,
   Droplets, ExternalLink, Flame, Home, Info, Link2, Pencil, Plus, Scale, Settings, Clock3, CircleX,
@@ -115,17 +115,35 @@ function bodyAnalysis(profile:ProfileData,weight:number):BodyAnalysis{const h=pr
 function weekRange(offset=0){const base=new Date();const day=base.getDay()||7;const start=new Date(base);start.setHours(12,0,0,0);start.setDate(start.getDate()-day+1+(offset*7));const end=new Date(start);end.setDate(start.getDate()+6);return{start:start.toLocaleDateString('sv-SE'),end:end.toLocaleDateString('sv-SE'),label:start.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' – '+end.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})};}
 
 
-function getAIKey(){return (import.meta as any).env?.VITE_OPENAI_API_KEY||'';}
+const AI_WORKER_URL='https://fitflow.lb-media-creationagency.workers.dev/api/ai';
+
 async function callOpenAI(messages:any[],jsonMode=false){
-  const key=getAIKey(); if(!key) throw new Error('NO_KEY');
-  const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'gpt-4o-mini',messages,temperature:.2,...(jsonMode?{response_format:{type:'json_object'}}:{})})});
+  const prepared = jsonMode
+    ? messages.map((m:any, i:number) =>
+        i === messages.length - 1 && m.role === 'user'
+          ? {
+              ...m,
+              content: Array.isArray(m.content)
+                ? [...m.content, {type:'text',text:'\nAntworte ausschließlich als gültiges JSON ohne Markdown-Codeblock.'}]
+                : String(m.content) + '\nAntworte ausschließlich als gültiges JSON ohne Markdown-Codeblock.'
+            }
+          : m
+      )
+    : messages;
+
+  const r=await fetch(AI_WORKER_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({messages:prepared})
+  });
   if(!r.ok) throw new Error('AI_'+r.status);
-  const j=await r.json(); return j.choices?.[0]?.message?.content||'';
+  const j=await r.json();
+  return j.answer || j.response || j.choices?.[0]?.message?.content || '';
 }
 function AIFoodModal({onClose,onAdd}:any){
   const[text,setText]=useState(''); const[loading,setLoading]=useState(false);
   const[result,setResult]=useState<Food|null>(null); const[error,setError]=useState('');
-  const run=async()=>{if(!text.trim())return;setLoading(true);setError('');try{const out=await callOpenAI([{role:'system',content:'Du bist ein Fitness-Ernährungsassistent. Schätze aus einer deutschen Beschreibung einer Mahlzeit realistische Nährwerte. Antworte ausschließlich als JSON mit name,kcal,protein,carbs,fat. Wenn Mengen fehlen, schätze vernünftig und runde. kcal als ganze Zahl, Makros als Zahl in Gramm.'},{role:'user',content:text}],true);const x=JSON.parse(out);setResult({id:Date.now(),name:String(x.name||text).slice(0,100),kcal:Math.max(0,Math.round(Number(x.kcal)||0)),protein:Math.max(0,Math.round(Number(x.protein)||0)),carbs:Math.max(0,Math.round(Number(x.carbs)||0)),fat:Math.max(0,Math.round(Number(x.fat)||0)),meal:'Snack'});}catch(e:any){setError(e?.message==='NO_KEY'?'API-Key fehlt. Trage VITE_OPENAI_API_KEY in .env.local ein.':'KI-Anfrage fehlgeschlagen. Prüfe API-Key und Internetverbindung.')}finally{setLoading(false)}};
+  const run=async()=>{if(!text.trim())return;setLoading(true);setError('');try{const out=await callOpenAI([{role:'system',content:'Du bist ein Fitness-Ernährungsassistent. Schätze aus einer deutschen Beschreibung einer Mahlzeit realistische Nährwerte. Antworte ausschließlich als JSON mit name,kcal,protein,carbs,fat. Wenn Mengen fehlen, schätze vernünftig und runde. kcal als ganze Zahl, Makros als Zahl in Gramm.'},{role:'user',content:text}],true);const x=JSON.parse(out);setResult({id:Date.now(),name:String(x.name||text).slice(0,100),kcal:Math.max(0,Math.round(Number(x.kcal)||0)),protein:Math.max(0,Math.round(Number(x.protein)||0)),carbs:Math.max(0,Math.round(Number(x.carbs)||0)),fat:Math.max(0,Math.round(Number(x.fat)||0)),meal:'Snack'});}catch(e:any){setError(e?.message?.startsWith('AI_')?'KI-Serverfehler ('+e.message.slice(3)+'). Prüfe den Cloudflare-Worker.':'KI-Anfrage fehlgeschlagen. Prüfe Internetverbindung und Cloudflare-Worker.')}finally{setLoading(false)}};
   return <Modal title="Mahlzeit mit KI analysieren" onClose={onClose}><div className="form-grid"><label className="field"><span>Was hast du gegessen?</span><textarea rows={5} value={text} onChange={e=>setText(e.target.value)} placeholder="z. B. 200 g Hähnchen, 150 g Reis, Gemüse und 1 EL Olivenöl"/></label><button className="primary-btn" onClick={run} disabled={loading||!text.trim()}><Sparkles/>{loading?'KI analysiert…':'Nährwerte berechnen'}</button>{error&&<p className="hint">{error}</p>}{result&&<div className="card"><b>{result.name}</b><p>{result.kcal} kcal · {result.protein} g Protein · {result.carbs} g KH · {result.fat} g Fett</p><button className="secondary-btn" onClick={()=>onAdd(result)}>Übernehmen</button></div>}</div></Modal>
 }
 function SavedMealsModal({meals,daily,onClose,onAdd,onSave,onDelete}:any){
@@ -139,7 +157,7 @@ function FoodAlbum({photos,onClose,onAdd}:any){
 function AIBodyScanModal({profile,weight,onClose,onSave}:any){
   const[front,setFront]=useState<File|null>(null);const[side,setSide]=useState<File|null>(null);const[back,setBack]=useState<File|null>(null);const[loading,setLoading]=useState(false);const[result,setResult]=useState<any>(null);const[error,setError]=useState('');
   const fileToData=async(f:File)=>{return await new Promise<string>((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result));r.onerror=rej;r.readAsDataURL(f)})};
-  const run=async()=>{if(!front){setError('Bitte mindestens ein Frontfoto auswählen.');return}setLoading(true);setError('');try{const imgs=await Promise.all([front,side,back].filter(Boolean).map(f=>fileToData(f as File)));const content:any[]=[{type:'text',text:`Analysiere diese Fitness-Fotos als vorsichtige, nicht-medizinische Körperform-Einschätzung. Person: ${profile.age} Jahre, ${profile.height} cm, ${profile.sex}, ${weight} kg. Schätze KFA nur als groben Bereich, nicht als exakte Messung. Gib außerdem neutrale Beobachtungen zu Haltung, sichtbarer Muskelentwicklung und sinnvollen Trainings-/Ernährungsbereichen. Keine medizinischen Diagnosen. Antworte als JSON mit kfa_low,kfa_high,summary,improvements.`}];imgs.forEach(u=>content.push({type:'image_url',image_url:{url:u}}));const out=await callOpenAI([{role:'user',content}],true);const x=JSON.parse(out);setResult(x);}catch(e:any){setError(e?.message==='NO_KEY'?'API-Key fehlt. Trage VITE_OPENAI_API_KEY in .env.local ein.':'AI Body Scan fehlgeschlagen. Prüfe API-Key, Bilder und Internetverbindung.')}finally{setLoading(false)}};
+  const run=async()=>{if(!front){setError('Bitte mindestens ein Frontfoto auswählen.');return}setLoading(true);setError('');try{const imgs=await Promise.all([front,side,back].filter(Boolean).map(f=>fileToData(f as File)));const content:any[]=[{type:'text',text:`Analysiere diese Fitness-Fotos als vorsichtige, nicht-medizinische Körperform-Einschätzung. Person: ${profile.age} Jahre, ${profile.height} cm, ${profile.sex}, ${weight} kg. Schätze KFA nur als groben Bereich, nicht als exakte Messung. Gib außerdem neutrale Beobachtungen zu Haltung, sichtbarer Muskelentwicklung und sinnvollen Trainings-/Ernährungsbereichen. Keine medizinischen Diagnosen. Antworte als JSON mit kfa_low,kfa_high,summary,improvements.`}];imgs.forEach(u=>content.push({type:'image_url',image_url:{url:u}}));const out=await callOpenAI([{role:'user',content}],true);const x=JSON.parse(out);setResult(x);}catch(e:any){setError(e?.message?.startsWith('AI_')?'KI-Serverfehler ('+e.message.slice(3)+'). Prüfe den Cloudflare-Worker.':'AI Body Scan fehlgeschlagen. Prüfe Bilder, Internetverbindung und Cloudflare-Worker.')}finally{setLoading(false)}};
   const saveResult=()=>{if(!result)return;const low=Number(result.kfa_low)||0,high=Number(result.kfa_high)||0;onSave({date:today(),bmi:Math.round(weight/((profile.height/100)**2)*10)/10,kfa:Math.round(((low+high)/2)*10)/10,muscleMass:0,note:`AI-Fotoanalyse: ${result.summary||''} ${result.improvements||''}`});};
   return <Modal title="AI Body Scan" onClose={onClose}><p className="hint">Nur eine grobe visuelle Schätzung – Fotos können KFA und Körperform nicht zuverlässig messen.</p><div className="form-grid">{[['Frontfoto',front,setFront],['Seitenfoto',side,setSide],['Rückenfoto',back,setBack]].map(([label,file,setter]:any)=><label className="secondary-btn file-btn" key={label}><Camera/> {file?file.name:label}<input type="file" accept="image/*" onChange={e=>setter(e.target.files?.[0]||null)}/></label>)}<button className="primary-btn" onClick={run} disabled={loading}>{loading?'AI analysiert Fotos…':'Fotos analysieren'}</button>{error&&<p className="hint">{error}</p>}{result&&<div className="card"><b>KFA-Schätzung: {result.kfa_low}–{result.kfa_high}%</b><p>{result.summary}</p><p><b>Ansatzpunkte:</b> {result.improvements}</p><button className="secondary-btn" onClick={saveResult}>Formcheck speichern</button></div>}</div></Modal>
 }
